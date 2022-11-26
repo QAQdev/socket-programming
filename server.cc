@@ -102,7 +102,7 @@ public:
                     std::cout << "[server] client#" << args->conn_fd << "wants to get time. The time is " << ctime(&t)
                               << std::endl;
                     send_buffer[0] = GET_TIME; // 设置包头
-                    sprintf(send_buffer + 1, "%ld", t);
+                    sprintf(send_buffer + 1, "%s", ctime(&t));
 
                     if (send(args->conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;

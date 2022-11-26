@@ -29,7 +29,7 @@ private:
         return choice;
     }
 
-    static void *thread_handler(void *input){
+    [[noreturn]] static void *thread_handler(void *input){
         int fileDescriptor = *(int *)input;
         tmp t{};
         char buffer[BUFSIZE];
@@ -37,13 +37,11 @@ private:
         while(true){
             memset(buffer, 0, BUFSIZE);
             auto len = recv(fileDescriptor, buffer, BUFSIZE, 0);
+            if (len <= 0 ) continue;
             std::unique_lock<std::mutex> lck(mtx);
 
-            if(buffer[0] == PacketType::EXIT){
-                break;
-            }
-            if(buffer[0] == 114) {//REPOST
-                std::cout << buffer << std::endl;
+            if(buffer[0] == FORWORD) {//REPOST
+                std::cout << buffer + 1 << std::endl;
             }
             t.type = static_cast<unsigned char >(buffer[0]);
             memcpy(t.data, buffer + 1, len - 1);
@@ -67,19 +65,33 @@ private:
 public:
     Client() = default;
     void Init() {
-        _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (_socket_fd == -1) {
-            throw std::exception();
-        }
+//        _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
+//        if (_socket_fd == -1) {
+//            throw std::exception();
+//        }
     }
     [[noreturn]] void run() {
         while (true) {
             int choice = getChoice();
+            if (choice != 1 && not isConnectionExists()) {
+                printError("NO CONNECTION!");
+                continue;
+            }
             switch (choice) {
                 case 1:{ // connect
-                    if (isConnectionExists()) {
-                        printInfo("a socket connection has been built!");
+                    if (not isConnectionExists()) {
+                        _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
                     }
+//                    std::string ip;
+//                    int port;
+//                    printInfo("input IP");
+//                    std::cin >> ip;
+//                    printInfo("input port");
+//                    std::cin >> port;
+//
+//                    _server_address.sin_family = AF_INET;
+//                    _server_address.sin_port = htons(port);
+//                    _server_address.sin_addr.s_addr = inet_addr(ip.c_str());
                     std::string ip;
                     int port;
                     printInfo("input IP");
@@ -89,8 +101,11 @@ public:
                     _server_address.sin_family = AF_INET;
                     _server_address.sin_port = htons(port);
                     _server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+
                     if (connect(_socket_fd, (struct sockaddr*)&_server_address, sizeof(struct sockaddr)) == -1) {
                         printError("建立连接失败");
+                        close(_socket_fd);
+                        _socket_fd = -1;
                         break;
                     }
                     pthread_create(&connected_thread, nullptr, thread_handler, &_socket_fd);
@@ -99,8 +114,9 @@ public:
                 case 2: { //disconnect
                     if (not isConnectionExists()) {
                         printError("no socket connection!");
+                        break;
                     }
-                    char fin = static_cast<char >(4); //EOT
+                    char fin = static_cast<char >(DISCONNECT);
                     if (send(_socket_fd, &fin, sizeof fin, 0) <= 0) {
                         printError("cannot send final signal");
                         break;
@@ -113,53 +129,67 @@ public:
                 case 3: { //get time
                     char get_time = static_cast<char >(PacketType::GET_TIME);
                     send(_socket_fd, &get_time, sizeof get_time, 0);
-                    while (true) {
-                        std::unique_lock<std::mutex> lck(mtx);
-                        while (msg_lst.empty()) {
-                            cr.wait(lck);
-                        }
-                        auto tmp = std::move(msg_lst.front());
-                        std::cout << "huoqushijian：" << std::endl;
-                        msg_lst.pop_front();
-                        break;
+                    std::unique_lock<std::mutex> lck(mtx);
+                    while (msg_lst.empty()) {
+                        cr.wait(lck);
                     }
+                    auto tmp = msg_lst.front();
+                    std::cout << "获取时间：" << tmp.data + 1 << std::endl;
+                    msg_lst.pop_front();
+                    break;
                 }
                 case 4: {
-                    char get_time = static_cast<char >(PacketType::GET_NAME);
-                    send(_socket_fd, &get_time, sizeof get_time, 0);
-                    while (true) {
-                        std::unique_lock<std::mutex> lck(mtx);
-                        while (msg_lst.empty()) {
-                            cr.wait(lck);
-                        }
-                        auto tmp = std::move(msg_lst.front());
-                        std::cout << "huoquname：" << std::endl;
-                        msg_lst.pop_front();
-                        break;
+                    char get_name = static_cast<char >(PacketType::GET_NAME);
+                    send(_socket_fd, &get_name, sizeof get_name, 0);
+                    std::unique_lock<std::mutex> lck(mtx);
+                    while (msg_lst.empty()) {
+                        cr.wait(lck);
                     }
+                    auto tmp = msg_lst.front();
+                    std::cout << "获取时间：" << tmp.data + 1 << std::endl;
+                    msg_lst.pop_front();
                     break;
                 }
                 case 5: {
                     char get_list = static_cast<char >(PacketType::GET_ACTIVE_LIST);
                     send(_socket_fd, &get_list, sizeof get_list, 0);
-                    while (true) {
-                        std::unique_lock<std::mutex> lck(mtx);
-                        while (msg_lst.empty()) {
-                            cr.wait(lck);
-                        }
-                        auto tmp = std::move(msg_lst.front());
-                        std::cout << "huoqushijian：" << std::endl;
-                        msg_lst.pop_front();
-                        break;
+                    std::unique_lock<std::mutex> lck(mtx);
+                    while (msg_lst.empty()) {
+                        cr.wait(lck);
                     }
+                    auto tmp = msg_lst.front();
+                    std::cout << "获取用户列表：" << tmp.data + 1 << std::endl;
+                    msg_lst.pop_front();
+                    break;
                 }
                 case 6: {
-
+                    char buffer[BUFSIZE];
+                    std::string ip;
+                    int port;
+                    printInfo("input IP");
+                    std::cin >> ip;
+                    printInfo("input port");
+                    std::cin >> port;
+                    buffer[0] = SEND_MSG;
+                    printInfo("请输入要发送的信息，CTRL-Z结束");
+                    sprintf(buffer + 1, "%s:%d:", ip.c_str(), port);
+                    char c;
+                    while(std::cin >> c){
+                        sprintf(buffer + strlen(buffer), "%c", c);
+                    }
+                    send(_socket_fd, &buffer, sizeof buffer, 0);
+                    std::unique_lock<std::mutex> lck(mtx);
+                    while (msg_lst.empty()) {
+                        cr.wait(lck);
+                    }
+                    auto tmp = msg_lst.front();
+                    std::cout << "发送信息：" << tmp.data + 1 << std::endl;
+                    msg_lst.pop_front();
                     break;
                 }
                 case 7: {
                     if (isConnectionExists()) {
-                        char fin = static_cast<char >(4);
+                        char fin = static_cast<char >(EXIT);
                         send(_socket_fd, &fin, sizeof fin, 0);
                         close(_socket_fd);
                     }
