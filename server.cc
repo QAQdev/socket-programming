@@ -1,7 +1,5 @@
 #include "util.hh"
 
-#include "util.hh"
-
 class Server {
 private:
     std::string _server_name{"oneko"}; // 服务端名称
