@@ -31,7 +31,7 @@ private:
 
     [[noreturn]] static void *thread_handler(void *input){
         int fileDescriptor = *(int *)input;
-        tmp t{};
+
         char buffer[BUFSIZE];
         recv(fileDescriptor, buffer, BUFSIZE, 0);
         while(true){
@@ -39,7 +39,7 @@ private:
             auto len = recv(fileDescriptor, buffer, BUFSIZE, 0);
             if (len <= 0 ) continue;
             std::unique_lock<std::mutex> lck(mtx);
-
+            tmp t{};
             if(buffer[0] == FORWORD) {//REPOST
                 std::cout << buffer + 1 << std::endl;
             }
@@ -65,10 +65,6 @@ private:
 public:
     Client() = default;
     void Init() {
-//        _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-//        if (_socket_fd == -1) {
-//            throw std::exception();
-//        }
     }
     [[noreturn]] void run() {
         while (true) {
@@ -82,16 +78,6 @@ public:
                     if (not isConnectionExists()) {
                         _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
                     }
-//                    std::string ip;
-//                    int port;
-//                    printInfo("input IP");
-//                    std::cin >> ip;
-//                    printInfo("input port");
-//                    std::cin >> port;
-//
-//                    _server_address.sin_family = AF_INET;
-//                    _server_address.sin_port = htons(port);
-//                    _server_address.sin_addr.s_addr = inet_addr(ip.c_str());
                     std::string ip;
                     int port;
                     printInfo("input IP");
@@ -134,7 +120,7 @@ public:
                         cr.wait(lck);
                     }
                     auto tmp = msg_lst.front();
-                    std::cout << "获取时间：" << tmp.data + 1 << std::endl;
+                    std::cout << "获取时间：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
                 }
@@ -146,7 +132,7 @@ public:
                         cr.wait(lck);
                     }
                     auto tmp = msg_lst.front();
-                    std::cout << "获取时间：" << tmp.data + 1 << std::endl;
+                    std::cout << "获取服务器名称：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
                 }
@@ -158,7 +144,7 @@ public:
                         cr.wait(lck);
                     }
                     auto tmp = msg_lst.front();
-                    std::cout << "获取用户列表：" << tmp.data + 1 << std::endl;
+                    std::cout << "获取用户列表：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
                 }
