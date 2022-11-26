@@ -34,18 +34,19 @@ private:
 
         char buffer[BUFSIZE];
         recv(fileDescriptor, buffer, BUFSIZE, 0);
-        while(true){
+        while(true) {
             memset(buffer, 0, BUFSIZE);
             auto len = recv(fileDescriptor, buffer, BUFSIZE, 0);
-            if (len <= 0 ) continue;
+            if (len <= 0) continue;
             std::unique_lock<std::mutex> lck(mtx);
             tmp t{};
-            if(buffer[0] == FORWORD) {//REPOST
-                std::cout << buffer + 1 << std::endl;
+            if (buffer[0] == FORWORD) {//REPOST
+                std::cout << "You received: " << buffer + 1 << std::endl;
             }
             t.type = static_cast<unsigned char >(buffer[0]);
             memcpy(t.data, buffer + 1, len - 1);
             msg_lst.push_back(t);
+
             cr.notify_all();
         }
     }
@@ -64,6 +65,11 @@ private:
 
 public:
     Client() = default;
+    ~Client() {
+        if (isConnectionExists()) {
+            close(_socket_fd);
+        }
+    }
     void Init() {
     }
     [[noreturn]] void run() {
@@ -80,14 +86,14 @@ public:
                     }
                     std::string ip;
                     int port;
-                    printInfo("input IP");
-                    std::cin >> ip;
-                    printInfo("input port");
-                    std::cin >> port;
+                    ip = "172.17.0.1";
+                    port = 5708;
+
                     _server_address.sin_family = AF_INET;
                     _server_address.sin_port = htons(port);
-                    _server_address.sin_addr.s_addr = htonl(INADDR_ANY);
-
+                    _server_address.sin_addr.s_addr = inet_addr(ip.c_str());
+//                    _server_address.sin_addr.s_addr = htonl(INADDR_ANY);
+                    std::cout << _socket_fd << std::endl;
                     if (connect(_socket_fd, (struct sockaddr*)&_server_address, sizeof(struct sockaddr)) == -1) {
                         printError("建立连接失败");
                         close(_socket_fd);
@@ -161,7 +167,8 @@ public:
                     sprintf(buffer + 1, "%s:%d:", ip.c_str(), port);
                     char c;
                     while(std::cin >> c){
-                        sprintf(buffer + strlen(buffer), "%c", c);
+                        if (c == '#') break;
+                        sprintf(buffer + strlen(buffer) + 1, "%c", c);
                     }
                     send(_socket_fd, &buffer, sizeof buffer, 0);
                     std::unique_lock<std::mutex> lck(mtx);
@@ -169,7 +176,7 @@ public:
                         cr.wait(lck);
                     }
                     auto tmp = msg_lst.front();
-                    std::cout << "发送信息：" << tmp.data + 1 << std::endl;
+                    std::cout << "发送信息：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
                 }
