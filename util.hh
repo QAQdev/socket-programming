@@ -11,7 +11,8 @@
 #include <vector>
 #include <map>
 #include <pthread.h>
-
+#include <list>
+#include <condition_variable>
 constexpr int BUFSIZE = 256;
 
 using fd_t  = int; // 文件描述符类型
