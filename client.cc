@@ -81,12 +81,12 @@ public:
             }
             switch (choice) {
                 case 1:{ // connect
-                    if (not isConnectionExists()) {
+                    if (!isConnectionExists()) {
                         _socket_fd = socket(AF_INET, SOCK_STREAM, 0);
                     }
                     std::string ip;
                     int port;
-                    ip = "172.17.0.1";
+                    ip = "192.168.122.66";
                     port = 5708;
 
                     _server_address.sin_family = AF_INET;
@@ -164,12 +164,15 @@ public:
                     std::cin >> port;
                     buffer[0] = SEND_MSG;
                     printInfo("请输入要发送的信息，CTRL-Z结束");
-                    sprintf(buffer + 1, "%s:%d:", ip.c_str(), port);
+                    sprintf(buffer + 1, "%s:%d:\n", ip.c_str(), port);
                     char c;
-                    while(std::cin >> c){
-                        if (c == '#') break;
-                        sprintf(buffer + strlen(buffer) + 1, "%c", c);
+                    while(c!='#') {
+                        std::cin >> c;
+                        sprintf(buffer + strlen(buffer), "%c", c);
                     }
+
+                    std::cout << buffer << std::endl;
+
                     send(_socket_fd, &buffer, sizeof buffer, 0);
                     std::unique_lock<std::mutex> lck(mtx);
                     while (msg_lst.empty()) {
@@ -182,7 +185,7 @@ public:
                 }
                 case 7: {
                     if (isConnectionExists()) {
-                        char fin = static_cast<char >(EXIT);
+                        char fin = static_cast<char >(DISCONNECT);
                         send(_socket_fd, &fin, sizeof fin, 0);
                         close(_socket_fd);
                     }

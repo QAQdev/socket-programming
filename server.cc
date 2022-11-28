@@ -88,7 +88,7 @@ public:
 
             memset(send_buffer, 0, BUFSIZE);
 
-            args->_mtx->lock(); // 互斥锁，确保同一时间只有一个线程访问和处理数据
+//            args->_mtx->lock(); // 互斥锁，确保同一时间只有一个线程访问和处理数据
 
             // 判断收到的包的类型
             switch (recv_buffer[0]) {
@@ -177,7 +177,7 @@ public:
                     break;
             }
             memset(recv_buffer, 0, BUFSIZE);
-            args->_mtx->unlock();
+//            args->_mtx->unlock();
         }
     }
 };
