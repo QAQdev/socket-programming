@@ -9,22 +9,15 @@ private:
     std::map<fd_t, client_t> _client_list;
     std::mutex _mtx;
 
-    class Args {
-    public:
+    struct Args {
         fd_t conn_fd;
         std::map<fd_t, client_t> *_client_list;
         std::mutex *_mtx;
-    public:
-        Args(fd_t fd, std::map<fd_t, client_t> *p_map, std::mutex *p_mtx) {
-            conn_fd = fd;
-            _client_list = p_map;
-            _mtx = p_mtx;
-        }
     };
 
 private:
     static void *task(void *args) {
-        conn_handler(static_cast<Args *>(args));
+        conn_handler(*(Args *) args);
         return nullptr;
     }
 
@@ -48,7 +41,7 @@ public:
         close(_sock_fd); // 关闭 socket 连接
     }
 
-    [[noreturn]] void run() {
+    void run() {
         std::cout << "server is running\n";
 
         while (true) {
@@ -72,57 +65,56 @@ public:
         }
     }
 
-    [[noreturn]] static void conn_handler(Args *args) {
+    static void conn_handler(Args args) {
         // 向客户端发送一个 hello
         std::string hello{"hello"};
-        send(args->conn_fd, hello.c_str(), hello.size(), 0);
+        send(args.conn_fd, hello.c_str(), hello.size(), 0);
 
         char recv_buffer[BUFSIZE] = {0};
         char send_buffer[BUFSIZE] = {0};
 
         while (true) {
-            auto length = recv(args->conn_fd, recv_buffer, BUFSIZE, 0);
+            auto length = recv(args.conn_fd, recv_buffer, BUFSIZE, 0);
             if (length < 0) {
                 std::cerr << "[server] recv() fails, errno is " << errno << std::endl;
             }
 
             memset(send_buffer, 0, BUFSIZE);
 
-            args->_mtx->lock(); // 互斥锁，确保同一时间只有一个线程访问和处理数据
-
+            args._mtx->lock(); // 互斥锁，确保同一时间只有一个线程访问和处理数据
             // 判断收到的包的类型
             switch (recv_buffer[0]) {
                 case DISCONNECT:
-                    args->_client_list->erase(args->conn_fd);
-                    std::cout << "[server] client#" << args->conn_fd << "disconnected\n";
+                    args._client_list->erase(args.conn_fd);
+                    std::cout << "[server] client#" << args.conn_fd << "disconnected\n";
                     break;
                 case GET_TIME:
                     time_t t;
                     time(&t);
-                    std::cout << "[server] client#" << args->conn_fd << "wants to get time. The time is " << ctime(&t)
+                    std::cout << "[server] client#" << args.conn_fd << "wants to get time. The time is " << ctime(&t)
                               << std::endl;
                     send_buffer[0] = GET_TIME; // 设置包头
                     sprintf(send_buffer + 1, "%s", ctime(&t));
 
-                    if (send(args->conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
+                    if (send(args.conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
                 case GET_NAME:
                     send_buffer[0] = GET_NAME;
                     gethostname(send_buffer + 1, sizeof(send_buffer) - sizeof(char));
-                    std::cout << "[server] client#" << args->conn_fd << "wants to get servername. The name is "
+                    std::cout << "[server] client#" << args.conn_fd << "wants to get servername. The name is "
                               << send_buffer + 1
                               << std::endl;
-                    if (send(args->conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
+                    if (send(args.conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
                 case GET_ACTIVE_LIST:
-                    std::cout << "[server] client#" << args->conn_fd << "wants to get active list\n";
+                    std::cout << "[server] client#" << args.conn_fd << "wants to get active list\n";
                     send_buffer[0] = GET_ACTIVE_LIST;
 
-                    for (const auto &client: *args->_client_list) {
+                    for (const auto &client: *args._client_list) {
                         fd_t fd = client.first;
                         inet_t ip = client.second.first;
                         port_t port = client.second.second;
@@ -131,7 +123,7 @@ public:
                         memcpy(send_buffer + strlen(send_buffer), say.c_str(), say.size());
                     }
 
-                    if (send(args->conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
+                    if (send(args.conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
@@ -143,11 +135,11 @@ public:
                     port_t port = stoi(data.substr(0, data.find(':')));
                     data = data.substr(data.find(':') + 2);
 
-                    std::cout << "[server] client#" << args->conn_fd << " send packet to " << ip << ":" << port
+                    std::cout << "[server] client#" << args.conn_fd << " send packet to " << ip << ":" << port
                               << std::endl;
 
                     fd_t target = -1; // 目标客户端
-                    for (const auto &client: *args->_client_list) {
+                    for (const auto &client: *args._client_list) {
                         if (client.second.first == ip && client.second.second == port) {
                             target = client.first;
                             break;
@@ -170,14 +162,13 @@ public:
                         std::cerr << "[server] send (repost) fails, errno is" << errno << std::endl;
                     }
                     // 向源客户端回复消息
-                    if (send(args->conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
+                    if (send(args.conn_fd, send_buffer, strlen(send_buffer), 0) < 0) {
                         std::cerr << "[server] send (reply) fails, errno is" << errno << std::endl;
                     }
-
                     break;
             }
             memset(recv_buffer, 0, BUFSIZE);
-            args->_mtx->unlock();
+            args._mtx->unlock();
         }
     }
 };
