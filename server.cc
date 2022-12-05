@@ -154,7 +154,7 @@ public:
                     }
 
                     char repost[BUFSIZE] = {0};
-                    repost[0] = FORWORD;
+                    repost[0] = FORWARD;
                     memcpy(repost + 1, data.c_str(), data.size());
 
                     // 向目标客户端转发

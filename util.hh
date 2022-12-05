@@ -28,5 +28,11 @@ enum PacketType {
     GET_ACTIVE_LIST,
     SEND_MSG,
     EXIT,
-    FORWORD
+    FORWARD
+};
+
+class Packet {
+public:
+    unsigned char type; //数据包类型
+    char data[BUFSIZE - 1]; //数据包内容
 };
