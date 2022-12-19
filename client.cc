@@ -40,11 +40,13 @@ private:
             std::unique_lock<std::mutex> lck(mtx); //为消息队列加锁
             Packet t{};
             if (buffer[0] == FORWARD) {//转发
-                std::cout << "你收到了消息: " << buffer + 1 << std::endl; //打印转发消息
+                std::cout << "你收到了消息: " << buffer + 1 << std::endl << "> "; //打印转发消息
+                std::cout.flush();
+            } else {
+                t.type = static_cast<unsigned char >(buffer[0]); //设置数据包类型
+                memcpy(t.data, buffer + 1, len - 1); //设置数据包内容
+                msg_lst.push_back(t); //加入消息队列
             }
-            t.type = static_cast<unsigned char >(buffer[0]); //设置数据包类型
-            memcpy(t.data, buffer + 1, len - 1); //设置数据包内容
-            msg_lst.push_back(t); //加入消息队列
             cr.notify_all(); //唤醒等待的主线程
         }
     }
@@ -110,7 +112,7 @@ public:
                     }
                     pthread_create(&connected_thread, nullptr, thread_handler, &_socket_fd); //创建接收消息的线程
                     break;
-                }
+                } // connect
                 case 2: { //断开连接
                     char fin = static_cast<char >(DISCONNECT);
                     if (send(_socket_fd, &fin, sizeof fin, 0) <= 0) {
@@ -123,21 +125,22 @@ public:
                     _socket_fd = -1;
                     printInfo("连接已断开");
                     break;
-                }
+                } //disconnect
                 case 3: { //get time
-                    char get_time = static_cast<char >(PacketType::GET_TIME);
-                    send(_socket_fd, &get_time, sizeof get_time, 0);
+                    char buffer = static_cast<char >(PacketType::GET_TIME);
+                    send(_socket_fd, &buffer, sizeof buffer, 0);
                     //发送请求时间的数据包
                     std::unique_lock<std::mutex> lck(mtx);
                     while (msg_lst.empty()) {
                         //如果消息队列为空，说明还未收到回复，则进入等待队列
                         cr.wait(lck);
                     }
+                    int cnt = 0;
                     auto tmp = msg_lst.front(); //收到时间数据包
                     std::cout << "获取时间：" << tmp.data << std::endl; //打印
                     msg_lst.pop_front();
                     break;
-                }
+                } //get time
                 case 4: {
                     char get_name = static_cast<char >(PacketType::GET_NAME);
                     send(_socket_fd, &get_name, sizeof get_name, 0);
@@ -151,7 +154,7 @@ public:
                     std::cout << "获取服务器名称：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
-                }
+                }  //get server name
                 case 5: {
                     char get_list = static_cast<char >(PacketType::GET_ACTIVE_LIST);
                     send(_socket_fd, &get_list, sizeof get_list, 0);
@@ -165,7 +168,7 @@ public:
                     std::cout << "获取用户列表：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
-                }
+                } // get active list
                 case 6: {
                     char buffer[BUFSIZE]{0};
                     //获取要发送的IP和端口号
@@ -179,9 +182,10 @@ public:
                     printInfo("请输入要发送的信息，#结束");
                     sprintf(buffer + 1, "%s:%d:\n", ip.c_str(), port);
                     char c = '\0';
-                    while(c != '#') {
+                    while(true) {
                         //获取输入
                         std::cin >> c;
+                        if (c == '#') break;
                         sprintf(buffer + strlen(buffer), "%c", c);
                     }
                     //接收转发消息的回复(转发信息发送后，服务器也会向发送消息的客户端发送应答包)
@@ -194,7 +198,7 @@ public:
                     std::cout << "发送信息：" << tmp.data << std::endl;
                     msg_lst.pop_front();
                     break;
-                }
+                } //send message
                 case 7: {
                     //退出程序
                     if (isConnectionExists()) {
@@ -204,7 +208,7 @@ public:
                         close(_socket_fd);
                     }
                     exit(0);
-                }
+                } //exit
                 default:{
                     std::cout << "不合法的选项。请重新输入" << std::endl;
                 }

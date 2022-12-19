@@ -41,9 +41,8 @@ public:
         close(_sock_fd); // 关闭 socket 连接
     }
 
-    void run() {
+    [[noreturn]] void run() {
         std::cout << "server is running\n";
-
         while (true) {
             sockaddr_in client{};
             int client_addr_len = sizeof(client);
@@ -78,17 +77,16 @@ public:
             if (length < 0) {
                 std::cerr << "[server] recv() fails, errno is " << errno << std::endl;
             }
-
             memset(send_buffer, 0, BUFSIZE);
-
             args._mtx->lock(); // 互斥锁，确保同一时间只有一个线程访问和处理数据
             // 判断收到的包的类型
             switch (recv_buffer[0]) {
-                case DISCONNECT:
+                case DISCONNECT: {
                     args._client_list->erase(args.conn_fd);
                     std::cout << "[server] client#" << args.conn_fd << "disconnected\n";
                     break;
-                case GET_TIME:
+                }
+                case GET_TIME: {
                     time_t t;
                     time(&t);
                     std::cout << "[server] client#" << args.conn_fd << "wants to get time. The time is " << ctime(&t)
@@ -100,7 +98,8 @@ public:
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
-                case GET_NAME:
+                }
+                case GET_NAME: {
                     send_buffer[0] = GET_NAME;
                     gethostname(send_buffer + 1, sizeof(send_buffer) - sizeof(char));
                     std::cout << "[server] client#" << args.conn_fd << "wants to get servername. The name is "
@@ -110,7 +109,8 @@ public:
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
-                case GET_ACTIVE_LIST:
+                }
+                case GET_ACTIVE_LIST: {
                     std::cout << "[server] client#" << args.conn_fd << "wants to get active list\n";
                     send_buffer[0] = GET_ACTIVE_LIST;
 
@@ -127,7 +127,8 @@ public:
                         std::cerr << "[server] send fails, errno is " << errno << std::endl;
                     }
                     break;
-                case SEND_MSG:
+                }
+                case SEND_MSG: {
                     std::string data = std::string(recv_buffer + 1);
                     std::string ip = data.substr(0, data.find(':'));
 
@@ -166,6 +167,7 @@ public:
                         std::cerr << "[server] send (reply) fails, errno is" << errno << std::endl;
                     }
                     break;
+                }
             }
             memset(recv_buffer, 0, BUFSIZE);
             args._mtx->unlock();
